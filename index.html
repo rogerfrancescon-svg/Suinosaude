@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SuinoSaúde — Protótipo Interativo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+  :root{
+    --bg:#0d1117; --surface:#161b22; --surface2:#1c2128; --surface3:#21262d; --border:#30363d;
+    --accent:#2ea043; --accent2:#3fb950; --warn:#d29922; --danger:#da3633; --info:#388bfd;
+    --text:#e6edf3; --text2:#8b949e; --text3:#6e7681; --primary:#1f6feb; --primary-light:#388bfd; --radius:12px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Sora,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center}
+  .app-shell{display:flex;width:100%;max-width:1400px;min-height:100vh}
+  .sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  .logo{padding:0 20px 24px;border-bottom:1px solid var(--border);margin-bottom:16px}
+  .logo-icon{font-size:28px;margin-bottom:4px}.logo h1{font-size:18px;font-weight:700;color:var(--accent2)}.logo p{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;border-left:3px solid transparent;font-size:13px;color:var(--text2);user-select:none}
+  .nav-item:hover{background:var(--surface3);color:var(--text)} .nav-item.active{background:rgba(31,111,235,.15);color:var(--primary-light);border-left-color:var(--primary)}
+  .nav-num{width:22px;height:22px;border-radius:50%;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--text3)}
+  .nav-item.active .nav-num{background:var(--primary);color:#fff} .nav-item.done .nav-num{background:var(--accent);color:#fff}
+  .sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);line-height:1.5}
+  .main-content{flex:1;padding:32px 40px;overflow-y:auto;min-width:0;display:flex;flex-direction:column}
+  .stepper{display:flex;gap:0;margin-bottom:32px;background:var(--surface);border:1px solid var(--border);border-radius:40px;padding:6px;overflow-x:auto}
+  .step{flex:1;text-align:center;padding:7px 12px;border-radius:30px;font-size:11px;font-weight:600;color:var(--text3);cursor:pointer;white-space:nowrap}
+  .step.active{background:var(--primary);color:#fff}.step.done{color:var(--accent2)}
+  .screen{display:none}.screen.active{display:block}
+  .screen-header{margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--border)}
+  .screen-tag{display:inline-block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--primary-light);background:rgba(56,139,253,.12);padding:3px 10px;border-radius:20px;margin-bottom:8px}
+  .screen-header h2{font-size:24px;font-weight:700}.screen-header p{font-size:13px;color:var(--text2);margin-top:4px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+  .card-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .card-title::before{content:'';width:3px;height:14px;background:var(--primary);border-radius:2px}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.form-grid.single{grid-template-columns:1fr}.form-grid.triple{grid-template-columns:1fr 1fr 1fr}
+  .field{display:flex;flex-direction:column;gap:6px}.field label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text2)}
+  .field input,.field select{background:var(--surface3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:Sora,sans-serif;font-size:13px;padding:9px 12px;outline:none;width:100%}
+  .field input:focus,.field select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(31,111,235,.15)} .field .hint{font-size:10px;color:var(--text3)}
+  .counter-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}.counter-box{background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}
+  .counter-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+  .counter-controls{display:flex;align-items:center;justify-content:center;gap:8px}.counter-btn{width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .counter-btn:hover{background:var(--primary);border-color:var(--primary);color:#fff}.counter-val{font-family:"JetBrains Mono",monospace;font-size:22px;font-weight:600;min-width:36px;text-align:center}
+  .result-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface3);border-radius:7px;margin-top:12px;gap:12px}
+  .result-label{font-size:12px;color:var(--text2)} .result-value{font-family:"JetBrains Mono",monospace;font-size:18px;font-weight:600;color:var(--primary-light)}
+  .alert{border-radius:8px;padding:12px 16px;margin-top:12px;font-size:13px;font-weight:500;display:none;align-items:flex-start;gap:10px}.alert.visible{display:flex}
+  .alert-warn{background:rgba(210,153,34,.12);border:1px solid rgba(210,153,34,.4);color:#e3a008}.alert-danger{background:rgba(218,54,51,.12);border:1px solid rgba(218,54,51,.4);color:#f85149}.alert-ok{background:rgba(46,160,67,.12);border:1px solid rgba(46,160,67,.4);color:var(--accent2)}
+  .alert-icon{font-size:18px;flex-shrink:0;margin-top:-1px}
+  .btn-row{display:flex;gap:12px;margin-top:24px;flex-wrap:wrap}
+  .btn{padding:10px 20px;border-radius:7px;border:none;font-family:Sora,sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+  .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-light)} .btn-success{background:var(--accent);color:#fff}.btn-success:hover{background:var(--accent2)}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2)} .btn-outline:hover{border-color:var(--text2);color:var(--text)}
+  .btn-danger-outline{background:transparent;border:1px solid var(--danger);color:var(--danger)} .btn-danger-outline:hover{background:rgba(218,54,51,.1)}
+  .btn-lg{padding:13px 28px;font-size:14px}
+  .dashboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;display:flex;align-items:center;gap:16px}
+  .stat-icon{font-size:32px}.stat-value{font-family:"JetBrains Mono",monospace;font-size:26px;font-weight:700}.stat-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.8px}
+  .stat-badge{margin-left:auto;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase}
+  .badge-ok{background:rgba(46,160,67,.15);color:var(--accent2)} .badge-warn{background:rgba(210,153,34,.15);color:#e3a008} .badge-danger{background:rgba(218,54,51,.15);color:#f85149}
+  .chart-container{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+  .chart-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .chart-title::before{content:'';width:3px;height:14px;background:var(--info);border-radius:2px}
+  canvas{max-height:320px;width:100%!important}
+  .score-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)} .score-row:last-child{border-bottom:none}
+  .score-dot{width:14px;height:14px;border-radius:50%}.score-info{display:flex;flex-direction:column}.score-name{font-size:13px;font-weight:500}.score-desc{font-size:11px;color:var(--text3)}
+  .alert-dot{width:7px;height:7px;border-radius:50%;background:var(--danger);margin-left:auto;display:none}.alert-dot.visible{display:block}
+  .divider{border:none;border-top:1px solid var(--border);margin:20px 0}
+  .history-toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .selection-info{font-size:12px;color:var(--text2);background:var(--surface3);border:1px solid var(--border);padding:8px 12px;border-radius:8px}
+  .history-selection-panel{display:flex;flex-direction:column;gap:12px;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:12px}
+  .history-selection-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .history-select-btn{flex:0 0 auto;min-width:150px;justify-content:center}
+  .history-export-btn{min-width:120px;justify-content:center}
+  .export-actions-row{padding-top:2px}
+  .history-item{display:flex;flex-direction:column;padding:16px;background:var(--surface3);border-radius:8px;margin-bottom:16px;border:1px solid var(--border)}
+  .history-top{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;width:100%}
+  .history-left{display:flex;gap:12px;align-items:flex-start;min-width:0}.history-check{margin-top:4px;accent-color:var(--primary);transform:scale(1.1);cursor:pointer}
+  .history-item h4{margin-bottom:6px;color:var(--primary-light);font-size:15px}.history-item p{font-size:12px;color:var(--text2);margin-bottom:4px}
+  .sync-badge{font-size:10px;font-weight:700;padding:4px 8px;border-radius:4px;display:inline-flex;align-items:center;gap:4px}
+  .score-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:700;margin-left:8px;vertical-align:middle}
+  .score-chip.good{background:rgba(46,160,67,.15);color:var(--accent2)} .score-chip.mid{background:rgba(210,153,34,.15);color:#e3a008} .score-chip.bad{background:rgba(218,54,51,.15);color:#f85149}
+  .history-actions{display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px dashed var(--border);flex-wrap:wrap}
+  .btn-hist{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 16px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s;display:flex;align-items:center;justify-content:center;gap:6px;font-family:Sora,sans-serif;flex:1}
+  .btn-hist:hover{background:var(--primary);border-color:var(--primary);color:#fff} .btn-hist.excel:hover{background:var(--accent);border-color:var(--accent);color:#fff} .btn-hist.wa:hover{background:#25d366;border-color:#25d366;color:#fff} .btn-hist.danger{color:var(--danger);border-color:var(--danger);flex:.5} .btn-hist.danger:hover{background:var(--danger);color:#fff}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 20px;font-size:13px;color:var(--text);display:flex;align-items:center;gap:10px;z-index:1000;box-shadow:0 8px 32px rgba(0,0,0,.5);transform:translateY(80px);opacity:0;transition:.3s cubic-bezier(.34,1.56,.64,1);pointer-events:none}
+  .toast.show{transform:translateY(0);opacity:1}
+  @media (max-width:700px){
+    .sidebar{display:none}.main-content{padding:20px}.form-grid,.form-grid.triple,.dashboard-grid,.counter-grid{grid-template-columns:1fr}.score-row{grid-template-columns:1fr;text-align:center;justify-items:center}.score-info{align-items:center;text-align:center;margin-bottom:8px}.history-top{flex-direction:column}.history-left{width:100%}.history-actions{flex-direction:column}.btn-hist{width:100%;justify-content:center}
+  }
+</style>
+</head>
+<body autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">🐷</div>
+      <h1>SuinoSaúde</h1>
+      <p>Avaliação Sanitária</p>
+    </div>
+    <div class="nav-item active" onclick="goTo(1)" id="nav1"><span class="nav-num">1</span>Cadastro da Visita</div>
+    <div class="nav-item" onclick="goTo(2)" id="nav2"><span class="nav-num">2</span>Ambiência</div>
+    <div class="nav-item" onclick="goTo(3)" id="nav3"><span class="nav-num">3</span>Sistema Respiratório<span class="alert-dot" id="dot3"></span></div>
+    <div class="nav-item" onclick="goTo(4)" id="nav4"><span class="nav-num">4</span>Sistema Entérico<span class="alert-dot" id="dot4"></span></div>
+    <div class="nav-item" onclick="goTo(5)" id="nav5"><span class="nav-num">5</span>Dashboard</div>
+    <div class="nav-item" onclick="goTo(6)" id="nav6"><span class="nav-num">6</span>Histórico Local</div>
+    <div class="nav-item" onclick="toggleTheme()" style="margin-top:auto;margin-bottom:16px;"><span class="nav-num">🌗</span> Alternar Tema</div>
+    <div class="sidebar-footer">Modo Offline Ativo ✓<br><span style="color:var(--text3)">Desenvolvido por<br><strong>Roger Francescon</strong></span></div>
+  </nav>
+
+  <main class="main-content">
+    <div class="stepper">
+      <div class="step active" onclick="goTo(1)" id="step1">Cadastro</div>
+      <div class="step" onclick="goTo(2)" id="step2">Ambiência</div>
+      <div class="step" onclick="goTo(3)" id="step3">Respiratório</div>
+      <div class="step" onclick="goTo(4)" id="step4">Entérico</div>
+      <div class="step" onclick="goTo(5)" id="step5">Resumo</div>
+      <div class="step" onclick="goTo(6)" id="step6">Histórico</div>
+    </div>
+
+    <div class="screen active" id="screen1">
+      <div class="screen-header">
+        <div class="screen-tag">Tela 1 de 6</div>
+        <h2>Cadastro da Visita</h2>
+        <p>Preencha os metadados antes de iniciar a avaliação clínica. O progresso é salvo automaticamente.</p>
+      </div>
+
+      <datalist id="racao_list"></datalist>
+      <datalist id="meds_list"></datalist>
+
+      <div class="card">
+        <div class="card-title">Identificação</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Nome do Produtor <span class="req">*</span></label>
+            <input type="text" id="f_producer" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Ex: João Silva" oninput="saveField()">
+          </div>
+          <div class="field">
+            <label>Local / Granja <span class="req">*</span></label>
+            <input type="text" id="f_farm" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Ex: Granja Santa Fé" oninput="saveField()">
+          </div>
+          <div class="field">
+            <label>Data da Visita</label>
+            <input type="date" id="f_date" autocomplete="off" oninput="saveField()">
+          </div>
+          <div class="field">
+            <label>Fase de Criação <span class="req">*</span></label>
+            <select id="f_phase" onchange="saveField()">
+              <option value="">— Selecione —</option>
+              <option>Maternidade (leitões lactentes)</option>
+              <option>Creche (leitões desmamados)</option>
+              <option>Crescimento</option>
+              <option>Terminação</option>
+              <option>Reprodução (matriz/cachaço)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Manejo e Protocolo</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Tipo de Ração</label>
+            <input type="text" id="f_feed" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" list="racao_list" placeholder="Ex: Ração inicial pré-starter" oninput="saveField()">
+          </div>
+          <div class="field">
+            <label>Protocolo Medicamentoso</label>
+            <input type="text" id="f_meds" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" list="meds_list" placeholder="Ex: Amoxicilina 20 mg/kg por 5 dias" oninput="saveField()">
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="border-color:var(--primary);background:rgba(31,111,235,.04)">
+        <div class="card-title" style="color:var(--primary-light)">Tamanho do Lote</div>
+        <div class="form-grid single">
+          <div class="field">
+            <label>Nº Total de Animais no Lote <span class="req">*</span></label>
+            <input type="number" id="f_total" min="1" placeholder="Ex: 120" oninput="updateTotalAnimals()" style="font-size:18px;padding:12px;font-family:'JetBrains Mono',monospace">
+            <span class="hint">⚠️ Este número é usado em todos os cálculos de frequência e na dedução de animais saudáveis. Obrigatório.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row"><button class="btn btn-primary btn-lg" onclick="goTo(2)">Próximo: Ambiência →</button></div>
+    </div>
+
+    <div class="screen" id="screen2">
+      <div class="screen-header">
+        <div class="screen-tag">Tela 2 de 6 — Qualidade do Ar</div>
+        <h2>Ambiência e Clima</h2>
+        <p>Informe os dados climáticos do galpão no momento da avaliação.</p>
+      </div>
+
+      <div class="card" style="border-left:3px solid var(--warn)">
+        <div class="card-title">🌡️ Parâmetros de Galpão</div>
+        <div class="form-grid triple">
+          <div class="field">
+            <label>Temperatura (°C)</label>
+            <input type="number" id="f_temp" autocomplete="off" placeholder="Ex: 24" oninput="saveField()">
+          </div>
+          <div class="field">
+            <label>Umidade Relativa (%)</label>
+            <input type="number" id="f_umidade" autocomplete="off" placeholder="Ex: 65" oninput="saveField()">
+          </div>
+          <div class="field">
+            <label>Nível de CO2 (ppm)</label>
+            <input type="number" id="f_co2" autocomplete="off" placeholder="Ex: 1500" oninput="saveField()">
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="goTo(1)">← Voltar</button>
+        <button class="btn btn-primary btn-lg" onclick="startAssessment()">🚀 Iniciar Avaliação Clínica →</button>
+      </div>
+    </div>
+
+    <div class="screen" id="screen3">
+      <div class="screen-header">
+        <div class="screen-tag">Tela 3 de 6 — Avaliação Clínica</div>
+        <h2>I. Sistema Respiratório</h2>
+        <p>Registre as contagens em 3 momentos distintos de observação do lote.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🫁 Contagem de Tosses</div>
+        <div class="counter-grid">
+          <div class="counter-box"><div class="counter-label">Contagem 1</div><div class="counter-controls"><div class="counter-btn" onclick="adjust('c1',-1)">−</div><div class="counter-val" id="c1">0</div><div class="counter-btn" onclick="adjust('c1',1)">+</div></div></div>
+          <div class="counter-box"><div class="counter-label">Contagem 2</div><div class="counter-controls"><div class="counter-btn" onclick="adjust('c2',-1)">−</div><div class="counter-val" id="c2">0</div><div class="counter-btn" onclick="adjust('c2',1)">+</div></div></div>
+          <div class="counter-box"><div class="counter-label">Contagem 3</div><div class="counter-controls"><div class="counter-btn" onclick="adjust('c3',-1)">−</div><div class="counter-val" id="c3">0</div><div class="counter-btn" onclick="adjust('c3',1)">+</div></div></div>
+        </div>
+        <div class="result-row"><span class="result-label">Média das contagens</span><span class="result-value" id="cough_avg">0.0</span></div>
+        <div class="result-row"><span class="result-label">Frequência no lote <span style="font-size:10px;color:var(--text3)">(média / total × 100)</span></span><span class="result-value" id="cough_freq">0.0%</span></div>
+        <div class="alert alert-ok" id="alert_cough_ok"><span class="alert-icon">✅</span><div><strong>Normal</strong> — Frequência de tosse abaixo do limiar (10%).</div></div>
+        <div class="alert alert-warn" id="alert_cough_warn"><span class="alert-icon">⚠️</span><div><strong>Indicativo de Pneumonia</strong> — Frequência de tosses >= 10%.</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🤧 Contagem de Espirros</div>
+        <div class="counter-grid">
+          <div class="counter-box"><div class="counter-label">Contagem 1</div><div class="counter-controls"><div class="counter-btn" onclick="adjust('s1',-1)">−</div><div class="counter-val" id="s1">0</div><div class="counter-btn" onclick="adjust('s1',1)">+</div></div></div>
+          <div class="counter-box"><div class="counter-label">Contagem 2</div><div class="counter-controls"><div class="counter-btn" onclick="adjust('s2',-1)">−</div><div class="counter-val" id="s2">0</div><div class="counter-btn" onclick="adjust('s2',1)">+</div></div></div>
+          <div class="counter-box"><div class="counter-label">Contagem 3</div><div class="counter-controls"><div class="counter-btn" onclick="adjust('s3',-1)">−</div><div class="counter-val" id="s3">0</div><div class="counter-btn" onclick="adjust('s3',1)">+</div></div></div>
+        </div>
+        <div class="result-row"><span class="result-label">Média das contagens</span><span class="result-value" id="sneeze_avg">0.0</span></div>
+        <div class="result-row"><span class="result-label">Frequência no lote</span><span class="result-value" id="sneeze_freq">0.0%</span></div>
+        <div class="alert alert-ok" id="alert_sneeze_ok"><span class="alert-icon">✅</span><div><strong>Normal</strong> — Frequência de espirros abaixo do limiar (15%).</div></div>
+        <div class="alert alert-danger" id="alert_sneeze_danger"><span class="alert-icon">🔴</span><div><strong>Sugestivo de Rinite Atrófica Progressiva</strong> — Frequência de espirros >= 15%.</div></div>
+      </div>
+
+      <div class="btn-row"><button class="btn btn-outline" onclick="goTo(2)">← Voltar</button><button class="btn btn-primary" onclick="goTo(4)">Próximo: Sistema Entérico →</button></div>
+    </div>
+
+    <div class="screen" id="screen4">
+      <div class="screen-header">
+        <div class="screen-tag">Tela 4 de 6 — Avaliação Clínica</div>
+        <h2>II. Sistema Entérico (Digestivo)</h2>
+        <p>Classifique o escore fecal observado no lote e informe a duração do quadro.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💩 Contagem por Escore Fecal</div>
+
+        <div class="score-row">
+          <div class="score-dot" style="background:#2ea043"></div>
+          <div class="score-info">
+            <span class="score-name">Escore 1 — Fezes Normais</span>
+            <span class="score-desc">Calculado automaticamente (Total Animais - Escore 2 - Escore 3)</span>
+          </div>
+          <div class="counter-controls"><div class="counter-val" id="e1" style="font-size:18px;color:var(--accent2)">0</div></div>
+        </div>
+
+        <div class="score-row">
+          <div class="score-dot" style="background:#d29922"></div>
+          <div class="score-info">
+            <span class="score-name">Escore 2 — Fezes Pastosas/Cremosas</span>
+            <span class="score-desc">Consistência amolecida, sem forma definida</span>
+          </div>
+          <div class="counter-controls" style="gap:10px"><div class="counter-btn" onclick="adjustScore('e2',-1)">−</div><div class="counter-val" id="e2" style="font-size:18px">0</div><div class="counter-btn" onclick="adjustScore('e2',1)">+</div></div>
+        </div>
+
+        <div class="score-row">
+          <div class="score-dot" style="background:#da3633"></div>
+          <div class="score-info">
+            <span class="score-name">Escore 3 — Fezes Líquidas</span>
+            <span class="score-desc">Diarreia aquosa — critério de alerta</span>
+          </div>
+          <div class="counter-controls" style="gap:10px"><div class="counter-btn" onclick="adjustScore('e3',-1)">−</div><div class="counter-val" id="e3" style="font-size:18px">0</div><div class="counter-btn" onclick="adjustScore('e3',1)">+</div></div>
+        </div>
+
+        <hr class="divider">
+        <div class="form-grid triple">
+          <div class="result-row" style="flex-direction:column;align-items:center;text-align:center"><span class="result-label">Escore 1 (%)</span><span class="result-value" id="e1_pct" style="color:var(--accent2)">0.0%</span></div>
+          <div class="result-row" style="flex-direction:column;align-items:center;text-align:center"><span class="result-label">Escore 2 (%)</span><span class="result-value" id="e2_pct" style="color:#d29922">0.0%</span></div>
+          <div class="result-row" style="flex-direction:column;align-items:center;text-align:center"><span class="result-label">Escore 3 (%)</span><span class="result-value" id="e3_pct" style="color:var(--danger)">0.0%</span></div>
+        </div>
+        <div class="result-row"><span class="result-label">Diarreia líquida no lote (Escore 3 / Total Animais × 100)</span><span class="result-value" id="liq_freq" style="color:var(--danger)">0.0%</span></div>
+        <div class="alert alert-ok" id="alert_enteric_ok"><span class="alert-icon">✅</span><div><strong>Normal</strong> — Menos de 15% do lote com diarreia líquida.</div></div>
+        <div class="alert alert-danger" id="alert_enteric_danger"><span class="alert-icon">🔴</span><div><strong>LOTE AFETADO</strong> — Mais de 15% dos animais com diarreia líquida (Escore 3).</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⏱ Duração do Quadro Diarreico</div>
+        <div class="field">
+          <label>Tempo de duração observado</label>
+          <select id="f_duration" onchange="saveField()">
+            <option>Insignificante (&lt; 24h)</option>
+            <option>Curta (1–5 dias)</option>
+            <option>Longa (&gt; 5 dias)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="btn-row"><button class="btn btn-outline" onclick="goTo(3)">← Voltar</button><button class="btn btn-success" onclick="buildDashboard();goTo(5)">📊 Ver Resumo →</button></div>
+    </div>
+
+    <div class="screen" id="screen5">
+      <div class="screen-header">
+        <div class="screen-tag">Tela 5 de 6 — Resumo</div>
+        <h2>Painel de Resumo</h2>
+        <p>Visão consolidada dos índices sanitários. A exportação foi movida para a aba Histórico.</p>
+      </div>
+
+      <div class="dashboard-grid" id="stat_cards"></div>
+
+      <div class="card">
+        <div class="card-title">🏅 Score da Granja</div>
+        <div class="result-row"><span class="result-label">Nota automática</span><span class="result-value" id="current_score">0</span></div>
+        <div class="result-row"><span class="result-label">Classificação</span><span class="result-value" id="current_score_status">—</span></div>
+        <div class="alert alert-ok" id="score_ok"><span class="alert-icon">✅</span><div><strong>Excelente</strong> — pontuação alta e cenário sanitário confortável.</div></div>
+        <div class="alert alert-warn" id="score_warn"><span class="alert-icon">⚠️</span><div><strong>Atenção</strong> — há pontos de monitoramento que merecem intervenção.</div></div>
+        <div class="alert alert-danger" id="score_danger"><span class="alert-icon">🔴</span><div><strong>Crítico</strong> — necessidade de ação sanitária imediata.</div></div>
+      </div>
+
+      <div class="chart-container"><div class="chart-title">Índices Sanitários vs. Limiares de Alerta</div><canvas id="barChart"></canvas></div>
+      <div class="chart-container"><div class="chart-title">Distribuição dos Escores Fecais (%)</div><canvas id="pieChart"></canvas></div>
+      <div class="chart-container"><div class="chart-title">Evolução Sanitária por Produtor</div><canvas id="evolutionChart"></canvas></div>
+      <div class="card" id="alerts_summary"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="goTo(4)">← Editar Dados</button>
+        <button class="btn btn-danger-outline" onclick="clearFormData()">🧹 Limpar Formulário</button>
+        <button class="btn btn-primary" onclick="saveToLocalDB()">💾 Salvar Visita Local</button>
+      </div>
+    </div>
+
+    <div class="screen" id="screen6">
+      <div class="screen-header">
+        <div class="screen-tag">Tela 6 de 6</div>
+        <h2>Histórico de Visitas (Local)</h2>
+        <p>Selecione um ou vários relatórios para exportar ou apagar.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📤 Exportação de Relatórios</div>
+        <div class="history-selection-panel">
+          <div class="selection-info" id="selection_info">0 selecionados</div>
+          <div class="history-selection-row">
+            <button class="btn btn-outline history-select-btn" onclick="selectAllHistory()">Selecionar todos</button>
+            <button class="btn btn-danger-outline history-select-btn" onclick="clearSelection()">Limpar seleção</button>
+          </div>
+          <div class="history-selection-row export-actions-row">
+            <button class="btn btn-primary history-export-btn" onclick="exportSelectedPDF()">PDF</button>
+            <button class="btn btn-success history-export-btn" onclick="exportSelectedExcel()">Excel</button>
+            <button class="btn btn-outline history-export-btn" onclick="exportSelectedWhatsApp()">WhatsApp</button>
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--text3);margin-top:10px">Se nenhum item estiver selecionado, a exportação usa todo o histórico como fallback.</p>
+      </div>
+
+      <div class="btn-row" style="margin-bottom:24px;justify-content:space-between">
+        <button class="btn btn-outline" onclick="renderHistory()">🔄 Atualizar Lista</button>
+        <button class="btn btn-danger-outline" onclick="deleteSelectedHistory()">🗑️ Apagar Selecionados</button>
+      </div>
+      <div id="history_list"></div>
+    </div>
+
+    <div style="text-align:center;margin-top:auto;padding-top:40px;font-size:10px;color:var(--text3);letter-spacing:.5px">Desenvolvido por <strong>Roger Francescon</strong></div>
+  </main>
+</div>
+
+<div class="toast" id="toast"><span id="toast_icon">✅</span><span id="toast_msg">Ação concluída</span></div>
+
+<script>
+const state={totalAnimals:0,c1:0,c2:0,c3:0,s1:0,s2:0,s3:0,e1:0,e2:0,e3:0};
+let barChartInstance=null,pieChartInstance=null,evolutionChartInstance=null,isDarkMode=true,selectedReports=[];
+
+function safeGet(key, fallback='[]'){ try{ return localStorage.getItem(key) ?? fallback; }catch(e){ return fallback; } }
+function safeSet(key,val){ try{ localStorage.setItem(key,val); return true; }catch(e){ console.error(e); return false; } }
+
+function toggleTheme(){ isDarkMode=!isDarkMode; const r=document.documentElement;
+  if(isDarkMode){ r.style.setProperty('--bg','#0d1117'); r.style.setProperty('--surface','#161b22'); r.style.setProperty('--surface2','#1c2128'); r.style.setProperty('--surface3','#21262d'); r.style.setProperty('--text','#e6edf3'); r.style.setProperty('--text2','#8b949e'); r.style.setProperty('--border','#30363d'); }
+  else{ r.style.setProperty('--bg','#f6f8fa'); r.style.setProperty('--surface','#ffffff'); r.style.setProperty('--surface2','#f3f4f6'); r.style.setProperty('--surface3','#e5e7eb'); r.style.setProperty('--text','#1f2328'); r.style.setProperty('--text2','#656d76'); r.style.setProperty('--border','#d0d7de'); }
+}
+
+function formatDateBR(dateStr){ if(!dateStr) return new Date().toLocaleDateString('pt-BR'); const p=dateStr.split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:dateStr; }
+function parseDateFlexible(r){ if(!r) return new Date(0); if(r.rawDate&&/^\d{4}-\d{2}-\d{2}$/.test(r.rawDate)) return new Date(r.rawDate+'T00:00:00'); if(r.date&&/^\d{2}\/\d{2}\/\d{4}$/.test(r.date)){ const [d,m,y]=r.date.split('/'); return new Date(`${y}-${m}-${d}T00:00:00`); } return new Date(r.id||Date.now()); }
+function sanitizeSheetName(name){ return String(name||'Relatorio').replace(/[\[\]\:\*\?\/\\]/g,' ').replace(/\s+/g,' ').trim().slice(0,31)||'Relatorio'; }
+
+const defaultFeeds=["Pré-inicial 1","Pré-inicial 2","Inicial","Crescimento","Terminação","Lactação"];
+const defaultMeds=["Amoxicilina 20mg/kg (Água)","Tilmicosina 200g/ton (Ração)","Doxiciclina 10mg/kg (Água)","Tulatromicina 2.5mg/kg (Injetável)"];
+
+function loadDatalists(){
+  const customFeeds=JSON.parse(safeGet('suino_custom_feeds','[]')), customMeds=JSON.parse(safeGet('suino_custom_meds','[]'));
+  const allFeeds=[...new Set([...defaultFeeds,...customFeeds])], allMeds=[...new Set([...defaultMeds,...customMeds])];
+  const feedList=document.getElementById('racao_list'); feedList.innerHTML=''; allFeeds.forEach(v=>{const o=document.createElement('option');o.value=v;feedList.appendChild(o)});
+  const medsList=document.getElementById('meds_list'); medsList.innerHTML=''; allMeds.forEach(v=>{const o=document.createElement('option');o.value=v;medsList.appendChild(o)});
+}
+function saveCustomVocabulary(feed,med){
+  if(feed&&feed.trim()){ const x=JSON.parse(safeGet('suino_custom_feeds','[]')); if(!defaultFeeds.includes(feed)&&!x.includes(feed)){x.push(feed); safeSet('suino_custom_feeds',JSON.stringify(x));}}
+  if(med&&med.trim()){ const x=JSON.parse(safeGet('suino_custom_meds','[]')); if(!defaultMeds.includes(med)&&!x.includes(med)){x.push(med); safeSet('suino_custom_meds',JSON.stringify(x));}}
+  loadDatalists();
+}
+
+function saveField(){
+  const draft={ prod:f_producer.value, farm:f_farm.value, date:f_date.value, phase:f_phase.value, feed:f_feed.value, meds:f_meds.value, tot:f_total.value, temp:f_temp.value, umi:f_umidade.value, co2:f_co2.value, dur:f_duration.value, st:state };
+  safeSet('suino_draft',JSON.stringify(draft));
+}
+function loadDraft(){
+  const ds=safeGet('suino_draft',null);
+  if(ds){
+    const d=JSON.parse(ds);
+    if(d.prod)f_producer.value=d.prod; if(d.farm)f_farm.value=d.farm; if(d.date)f_date.value=d.date; if(d.phase)f_phase.value=d.phase; if(d.feed)f_feed.value=d.feed; if(d.meds)f_meds.value=d.meds; if(d.tot)f_total.value=d.tot; if(d.temp)f_temp.value=d.temp; if(d.umi)f_umidade.value=d.umi; if(d.co2)f_co2.value=d.co2; if(d.dur)f_duration.value=d.dur;
+    if(d.st){ state.totalAnimals=d.st.totalAnimals||0; ['c1','c2','c3','s1','s2','s3','e2','e3'].forEach(k=>{ state[k]=d.st[k]||0; if(document.getElementById(k)) document.getElementById(k).textContent=state[k]; }); }
+  }else{
+    const t=new Date(); f_date.value=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+  }
+  recalcAll();
+}
+
+function goTo(n){
+  document.querySelectorAll('.screen,.nav-item,.step').forEach(el=>el.classList.remove('active','done'));
+  const s=document.getElementById('screen'+n), nav=document.getElementById('nav'+n), step=document.getElementById('step'+n);
+  if(s) s.classList.add('active'); if(nav) nav.classList.add('active'); if(step) step.classList.add('active');
+  for(let i=1;i<n;i++){ const st=document.getElementById('step'+i), nv=document.getElementById('nav'+i); if(st) st.classList.add('done'); if(nv) nv.classList.add('done'); }
+  if(n===5) buildDashboard(); if(n===6) renderHistory();
+}
+function clearFormData(){
+  if(!confirm("Deseja realmente limpar todos os dados não salvos?")) return;
+  ['f_producer','f_farm','f_feed','f_meds','f_total','f_temp','f_umidade','f_co2'].forEach(id=>{document.getElementById(id).value=''});
+  ['c1','c2','c3','s1','s2','s3','e1','e2','e3'].forEach(k=>{state[k]=0; document.getElementById(k).textContent='0'});
+  state.totalAnimals=0; f_phase.value=''; f_duration.value='Insignificante (< 24h)'; safeSet('suino_draft','');
+  const t=new Date(); f_date.value=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+  recalcAll(); goTo(1); showToast('🧹 Formulário limpo!','#da3633');
+}
+function startAssessment(){
+  const prod=f_producer.value.trim(), farm=f_farm.value.trim(), phase=f_phase.value, total=parseInt(f_total.value)||0;
+  if(!prod) return showToast('⚠️ Informe o Nome do Produtor','#da3633');
+  if(!farm) return showToast('⚠️ Informe o Local/Granja','#da3633');
+  if(!phase) return showToast('⚠️ Selecione a Fase de Criação','#da3633');
+  if(total<=0) return showToast('⚠️ Informe o Nº de Animais (> 0)','#da3633');
+  showToast('✅ Visita iniciada! Redirecionando...','#2ea043'); setTimeout(()=>goTo(3),600);
+}
+function updateTotalAnimals(){ state.totalAnimals=parseInt(f_total.value)||0; recalcAll(); }
+function adjust(id,delta){ state[id]=Math.max(0,(state[id]||0)+delta); document.getElementById(id).textContent=state[id]; recalcAll(); }
+function adjustScore(id,delta){ adjust(id,delta); }
+function calcFreq(a,b,c,t){ return t<=0?0:(((a+b+c)/3)/t)*100; }
+function calculateScore(d){
+  let score=100;
+  if(d.cFreq>=10) score-=Math.min(25,8+(d.cFreq-10)*2);
+  if(d.sFreq>=15) score-=Math.min(20,6+(d.sFreq-15)*1.8);
+  if(d.liqFreq>15) score-=Math.min(35,10+(d.liqFreq-15)*2);
+  if(Number(d.co2)>2500) score-=8;
+  if(String(d.duration)==='Longa (> 5 dias)') score-=7;
+  if(Number(d.umidade)&& (Number(d.umidade)<55 || Number(d.umidade)>75)) score-=5;
+  if(Number(d.temp)&& (Number(d.temp)<18 || Number(d.temp)>28)) score-=5;
+  score=Math.max(0,Math.min(100,Math.round(score)));
+  return {score, status: score>=85?'Excelente': score>=70?'Atenção':'Crítico'};
+}
+function recalcAll(){
+  const T=state.totalAnimals, cAvg=(state.c1+state.c2+state.c3)/3, cFreq=calcFreq(state.c1,state.c2,state.c3,T), sAvg=(state.s1+state.s2+state.s3)/3, sFreq=calcFreq(state.s1,state.s2,state.s3,T);
+  cough_avg.textContent=cAvg.toFixed(1); cough_freq.textContent=cFreq.toFixed(1)+'%'; sneeze_avg.textContent=sAvg.toFixed(1); sneeze_freq.textContent=sFreq.toFixed(1)+'%';
+  alert_cough_ok.classList.toggle('visible',cFreq<10); alert_cough_warn.classList.toggle('visible',cFreq>=10); alert_sneeze_ok.classList.toggle('visible',sFreq<15); alert_sneeze_danger.classList.toggle('visible',sFreq>=15);
+  state.e1=Math.max(0,T-state.e2-state.e3); e1.textContent=state.e1;
+  const totalFeces=state.e1+state.e2+state.e3, e1p=totalFeces>0?(state.e1/totalFeces)*100:0, e2p=totalFeces>0?(state.e2/totalFeces)*100:0, e3p=totalFeces>0?(state.e3/totalFeces)*100:0, liqFreq=T>0?(state.e3/T)*100:0;
+  e1_pct.textContent=e1p.toFixed(1)+'%'; e2_pct.textContent=e2p.toFixed(1)+'%'; e3_pct.textContent=e3p.toFixed(1)+'%'; liq_freq.textContent=liqFreq.toFixed(1)+'%';
+  alert_enteric_ok.classList.toggle('visible',liqFreq<=15); alert_enteric_danger.classList.toggle('visible',liqFreq>15);
+  dot3.classList.toggle('visible',cFreq>=10 || sFreq>=15); dot4.classList.toggle('visible',liqFreq>15);
+  const current={ producer:f_producer.value||'—', farm:f_farm.value||'—', phase:f_phase.value||'—', feed:f_feed.value||'—', meds:f_meds.value||'—', rawDate:f_date.value||'', date:formatDateBR(f_date.value||''), temp:f_temp.value||'—', umidade:f_umidade.value||'—', co2:f_co2.value||'—', T, cAvg, cFreq, sAvg, sFreq, e1p, e2p, e3p, liqFreq, c1:state.c1,c2:state.c2,c3:state.c3,s1:state.s1,s2:state.s2,s3:state.s3,e1:state.e1,e2:state.e2,e3:state.e3,duration:f_duration.value||'—' };
+  const sc=calculateScore(current); current_score.textContent=sc.score; current_score_status.textContent=sc.status; score_ok.classList.toggle('visible',sc.score>=85); score_warn.classList.toggle('visible',sc.score<85 && sc.score>=70); score_danger.classList.toggle('visible',sc.score<70);
+  state._cFreq=cFreq; state._sFreq=sFreq; state._liqFreq=liqFreq; state._e1p=e1p; state._e2p=e2p; state._e3p=e3p; state._score=sc.score; state._scoreStatus=sc.status;
+  saveField();
+}
+
+function getExportData(){
+  const T=state.totalAnimals, cAvg=(state.c1+state.c2+state.c3)/3, cFreq=T>0?(cAvg/T)*100:0, sAvg=(state.s1+state.s2+state.s3)/3, sFreq=T>0?(sAvg/T)*100:0;
+  const totalFeces=state.e1+state.e2+state.e3, e1p=totalFeces>0?(state.e1/totalFeces)*100:0, e2p=totalFeces>0?(state.e2/totalFeces)*100:0, e3p=totalFeces>0?(state.e3/totalFeces)*100:0, liqFreq=T>0?(state.e3/T)*100:0;
+  const data={ producer:f_producer.value||'—', farm:f_farm.value||'—', phase:f_phase.value||'—', feed:f_feed.value||'—', meds:f_meds.value||'—', rawDate:f_date.value||'', date:formatDateBR(f_date.value||''), temp:f_temp.value||'—', umidade:f_umidade.value||'—', co2:f_co2.value||'—', T, c1:state.c1,c2:state.c2,c3:state.c3,s1:state.s1,s2:state.s2,s3:state.s3,e1:state.e1,e2:state.e2,e3:state.e3,cAvg,cFreq,sAvg,sFreq,e1p,e2p,e3p,liqFreq,duration:f_duration.value||'—' };
+  data.alerts=[]; if(cFreq>=10) data.alerts.push(`Tosses ${cFreq.toFixed(1)}% — Indicativo de Pneumonia`); if(sFreq>=15) data.alerts.push(`Espirros ${sFreq.toFixed(1)}% — Sugestivo de Rinite Atrófica Progressiva`); if(liqFreq>15) data.alerts.push(`Diarreia Líquida ${liqFreq.toFixed(1)}% — Lote Afetado`); if(Number(data.co2)>2500) data.alerts.push(`CO2 Elevado: ${data.co2} ppm — Ajustar ventilação mínima.`);
+  data.score=calculateScore({ cFreq, sFreq, liqFreq, co2:data.co2, duration:data.duration, temp:data.temp, umidade:data.umidade }).score;
+  data.scoreStatus=calculateScore({ cFreq, sFreq, liqFreq, co2:data.co2, duration:data.duration, temp:data.temp, umidade:data.umidade }).status;
+  return data;
+}
+function normalizeRecord(r){
+  const x={...r}; x.rawDate=x.rawDate||''; x.date=x.date||formatDateBR(x.rawDate); x.producer=x.producer||'—'; x.farm=x.farm||'—'; x.phase=x.phase||'—'; x.feed=x.feed||'—'; x.meds=x.meds||'—'; x.temp=x.temp||'—'; x.umidade=x.umidade||'—'; x.co2=x.co2||'—'; x.duration=x.duration||'—'; x.T=Number(x.T||0);
+  ['c1','c2','c3','s1','s2','s3','e1','e2','e3'].forEach(k=>x[k]=Number(x[k]||0));
+  x.cAvg=Number(x.cAvg||((x.c1+x.c2+x.c3)/3)); x.cFreq=Number(x.cFreq||(x.T>0?(x.cAvg/x.T)*100:0)); x.sAvg=Number(x.sAvg||((x.s1+x.s2+x.s3)/3)); x.sFreq=Number(x.sFreq||(x.T>0?(x.sAvg/x.T)*100:0));
+  const tf=x.e1+x.e2+x.e3; x.e1p=Number(x.e1p||(tf>0?(x.e1/tf)*100:0)); x.e2p=Number(x.e2p||(tf>0?(x.e2/tf)*100:0)); x.e3p=Number(x.e3p||(tf>0?(x.e3/tf)*100:0)); x.liqFreq=Number(x.liqFreq||(x.T>0?(x.e3/x.T)*100:0));
+  const sc=calculateScore(x); x.score=Number(x.score||sc.score); x.scoreStatus=x.scoreStatus||sc.status; x.alerts=Array.isArray(x.alerts)?x.alerts:[]; return x;
+}
+function getHistory(){ try{ return (JSON.parse(safeGet('suino_history','[]'))||[]).map(normalizeRecord); }catch(e){ return []; } }
+function getHistoryById(id){ return getHistory().find(v=>Number(v.id)===Number(id)); }
+function getExportTargets(useAllFallback=true){
+  const hist=getHistory().sort((a,b)=>parseDateFlexible(a)-parseDateFlexible(b));
+  const selected=hist.filter(r=>selectedReports.includes(Number(r.id)));
+  if(selected.length) return selected;
+  if(!useAllFallback){ showToast('⚠️ Selecione pelo menos um relatório.','#da3633'); return null; }
+  if(!hist.length){ showToast('⚠️ Não há relatórios no histórico.','#da3633'); return null; }
+  showToast('ℹ️ Nenhum selecionado. Exportando todo o histórico.','#388bfd');
+  return hist;
+}
+
+function buildDashboard(){
+  const d=getExportData();
+  const cards=[
+    {icon:'🏅', label:'Score da Granja', val:`${d.score}`, unit:d.scoreStatus, type:'score'},
+    {icon:'🫁', label:'Freq. Tosses', val:d.cFreq.toFixed(1)+'%', threshold:10, unit:'(limiar 10%)'},
+    {icon:'🤧', label:'Freq. Espirros', val:d.sFreq.toFixed(1)+'%', threshold:15, unit:'(limiar 15%)'},
+    {icon:'💧', label:'Diarreia Líquida', val:d.liqFreq.toFixed(1)+'%', threshold:15, unit:'(limiar 15%)'},
+    {icon:'🐖', label:'Total no Lote', val:d.T.toString(), threshold:null, unit:'animais'},
+  ];
+  stat_cards.innerHTML=cards.map(c=>{
+    let badge='';
+    if(c.type==='score'){ badge=`<span class="stat-badge ${c.val>=85?'badge-ok':(c.val>=70?'badge-warn':'badge-danger')}">${c.unit}</span>`; }
+    else if(c.threshold!==null){ const alert=parseFloat(c.val)>=c.threshold; badge=`<span class="stat-badge ${alert?'badge-danger':'badge-ok'}">${alert?'⚠️ Alerta':'✓ Normal'}</span>`; }
+    return `<div class="stat-card"><span class="stat-icon">${c.icon}</span><div><div class="stat-value">${c.val}</div><div class="stat-label">${c.label}</div><div style="font-size:10px;color:var(--text3)">${c.type==='score'?'':c.unit}</div></div>${badge}</div>`;
+  }).join('');
+  current_score.textContent=d.score; current_score_status.textContent=d.scoreStatus; score_ok.classList.toggle('visible',d.score>=85); score_warn.classList.toggle('visible',d.score<85 && d.score>=70); score_danger.classList.toggle('visible',d.score<70);
+
+  if(barChartInstance) barChartInstance.destroy();
+  barChartInstance=new Chart(barChart.getContext('2d'),{
+    data:{ labels:['Tosses','Espirros','Diarreia Líquida'], datasets:[
+      {type:'bar',label:'Encontrado (%)',data:[d.cFreq.toFixed(2),d.sFreq.toFixed(2),d.liqFreq.toFixed(2)],backgroundColor:[d.cFreq>=10?'rgba(218,54,51,.7)':'rgba(46,160,67,.7)',d.sFreq>=15?'rgba(218,54,51,.7)':'rgba(46,160,67,.7)',d.liqFreq>15?'rgba(218,54,51,.7)':'rgba(46,160,67,.7)'],borderColor:[d.cFreq>=10?'#da3633':'#2ea043',d.sFreq>=15?'#da3633':'#2ea043',d.liqFreq>15?'#da3633':'#2ea043'],borderWidth:1.5,borderRadius:5},
+      {type:'line',label:'Limiar de Alerta (%)',data:[10,15,15],borderColor:'#388bfd',borderWidth:2,borderDash:[5,5],pointBackgroundColor:'#388bfd',pointRadius:4,tension:0}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8b949e',font:{family:'Sora',size:11}}},tooltip:{callbacks:{label:(ctx)=>` ${ctx.dataset.label}: ${ctx.parsed.y}%`}}},scales:{y:{beginAtZero:true,max:Math.max(d.cFreq,d.sFreq,d.liqFreq,20)+5,ticks:{color:'#6e7681',callback:v=>v+'%',font:{family:'JetBrains Mono'}},grid:{color:'rgba(48,54,61,.8)'}},x:{ticks:{color:'#8b949e',font:{family:'Sora',size:12}},grid:{display:false}}}}
+  });
+
+  if(pieChartInstance) pieChartInstance.destroy();
+  const hasData=(d.e1p+d.e2p+d.e3p)>0;
+  pieChartInstance=new Chart(pieChart.getContext('2d'),{
+    type:'doughnut',
+    data:{labels:['Escore 1 — Normal','Escore 2 — Pastosa','Escore 3 — Líquida'],datasets:[{data:hasData?[d.e1p.toFixed(1),d.e2p.toFixed(1),d.e3p.toFixed(1)]:[100,0,0],backgroundColor:['rgba(46,160,67,.8)','rgba(210,153,34,.8)','rgba(218,54,51,.8)'],borderColor:['#2ea043','#d29922','#da3633'],borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{color:'#8b949e',font:{family:'Sora',size:11},padding:16}},tooltip:{callbacks:{label:(ctx)=>` ${ctx.label}: ${ctx.parsed.toFixed(1)}%`}}}}
+  });
+
+  renderEvolutionChart();
+
+  const alerts=[]; if(d.cFreq>=10) alerts.push({level:'warn',msg:`⚠️ Tosses: ${d.cFreq.toFixed(1)}% — Indicativo de Pneumonia (limiar: >= 10%)`}); if(d.sFreq>=15) alerts.push({level:'danger',msg:`🔴 Espirros: ${d.sFreq.toFixed(1)}% — Sugestivo de Rinite Atrófica Progressiva (limiar: >= 15%)`}); if(d.liqFreq>15) alerts.push({level:'danger',msg:`🔴 Lote Afetado: ${d.liqFreq.toFixed(1)}% com diarreia líquida (limiar: > 15%)`}); if(Number(d.co2)>2500) alerts.push({level:'warn',msg:`⚠️ CO2 Elevado: ${d.co2} ppm — Verifique a ventilação.`});
+  alerts_summary.innerHTML=`<div class="card-title">🏥 Resumo de Alertas — ${d.producer} | ${d.farm}</div>` + (alerts.length===0 ? `<div class="alert alert-ok visible" style="margin:0"><span class="alert-icon">✅</span><div><strong>Nenhum alerta sanitário identificado.</strong> Todos os índices dentro dos parâmetros normais.</div></div>` : alerts.map(a=>`<div class="alert alert-${a.level} visible" style="margin-bottom:8px"><span class="alert-icon"></span><div>${a.msg}</div></div>`).join(''));
+}
+
+function renderEvolutionChart(){
+  const history=getHistory().sort((a,b)=>parseDateFlexible(a)-parseDateFlexible(b)), canvas=evolutionChart;
+  if(!canvas) return;
+  if(evolutionChartInstance) evolutionChartInstance.destroy();
+  if(!history.length){
+    evolutionChartInstance=new Chart(canvas.getContext('2d'),{type:'line',data:{labels:['Sem histórico'],datasets:[{label:'Score',data:[0]}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{y:{beginAtZero:true,max:100,ticks:{color:'#6e7681'},grid:{color:'rgba(48,54,61,.8)'}},x:{ticks:{color:'#8b949e'},grid:{display:false}}}}});
+    return;
+  }
+  const producers=[...new Set(history.map(r=>r.producer))], labels=[...new Set(history.map(r=>formatDateBR(r.rawDate||r.date)))], colors=['#1f6feb','#2ea043','#d29922','#da3633','#8b5cf6','#14b8a6','#f59e0b','#ec4899'];
+  const datasets=producers.map((producer,idx)=>{ const recs=history.filter(r=>r.producer===producer); const points=labels.map(label=>{ const g=recs.filter(r=>formatDateBR(r.rawDate||r.date)===label); if(!g.length) return null; return +(g.reduce((s,x)=>s+Number(x.score||0),0)/g.length).toFixed(1); }); return {label:producer,data:points,borderColor:colors[idx%colors.length],backgroundColor:colors[idx%colors.length],tension:.25,borderWidth:2,spanGaps:true,pointRadius:3}; });
+  evolutionChartInstance=new Chart(canvas.getContext('2d'),{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8b949e',font:{family:'Sora',size:11}}},tooltip:{callbacks:{label:(ctx)=>` ${ctx.dataset.label}: ${ctx.parsed.y}`}}},scales:{y:{beginAtZero:true,max:100,ticks:{color:'#6e7681',font:{family:'JetBrains Mono'}},grid:{color:'rgba(48,54,61,.8)'}},x:{ticks:{color:'#8b949e',font:{family:'Sora',size:11}},grid:{display:false}}}}});
+}
+
+function generatePDF(recordsInput){
+  const records=(Array.isArray(recordsInput)?recordsInput:[recordsInput]).map(normalizeRecord);
+  const { jsPDF } = window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=doc.internal.pageSize.getWidth(), margin=14;
+  records.forEach((d,idx)=>{
+    if(idx>0) doc.addPage();
+    let y=14;
+    doc.setFillColor(15,63,138); doc.rect(0,0,W,26,'F'); doc.setTextColor(255,255,255); doc.setFontSize(14); doc.setFont('helvetica','bold'); doc.text('RELATÓRIO DE AVALIAÇÃO SANITÁRIA — SUÍNOS',margin,11); doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.text('SuinoSaúde • Sistema de Monitoramento Sanitário',margin,17); doc.text('Data: '+d.date,W-margin,17,{align:'right'}); if(records.length>1) doc.text(`Relatório ${idx+1} de ${records.length}`,W-margin,11,{align:'right'}); y=34;
+    doc.setTextColor(15,63,138); doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.text('I. DADOS DA VISITA E AMBIÊNCIA',margin,y); y+=4; doc.line(margin,y,W-margin,y); y+=5;
+    doc.autoTable({startY:y,margin:{left:margin,right:margin},theme:'grid',headStyles:{fillColor:[220,230,245],textColor:[30,30,30],fontStyle:'bold',fontSize:9},bodyStyles:{fontSize:9,textColor:[40,40,40]},columnStyles:{0:{cellWidth:55,fontStyle:'bold'}},body:[['Produtor',d.producer],['Granja / Local',d.farm],['Fase de Criação',d.phase],['Total de Animais no Lote',String(d.T)],['Tipo de Ração',d.feed],['Protocolo Medicamentoso',d.meds],['Ambiência (Temp / Umidade / CO2)',`${d.temp}°C / ${d.umidade}% / ${d.co2} ppm`],['Score Geral',`${d.score}/100 (${d.scoreStatus})`]]});
+    y=doc.lastAutoTable.finalY+10;
+    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(15,63,138); doc.text('II. SISTEMA RESPIRATÓRIO',margin,y); y+=4; doc.line(margin,y,W-margin,y); y+=5;
+    doc.autoTable({startY:y,margin:{left:margin,right:margin},theme:'grid',headStyles:{fillColor:[15,63,138],textColor:[255,255,255],fontStyle:'bold',fontSize:9},bodyStyles:{fontSize:9,textColor:[40,40,40]},columnStyles:{0:{fontStyle:'bold',cellWidth:38}},head:[['Parâmetro','Cont. 1','Cont. 2','Cont. 3','Média','Freq. (%)','Limiar','Status']],body:[['Tosses',d.c1||0,d.c2||0,d.c3||0,d.cAvg.toFixed(1),d.cFreq.toFixed(1)+'%','>= 10%',d.cFreq>=10?'ALERTA':'Normal'],['Espirros',d.s1||0,d.s2||0,d.s3||0,d.sAvg.toFixed(1),d.sFreq.toFixed(1)+'%','>= 15%',d.sFreq>=15?'ALERTA':'Normal']],didParseCell(info){ if(typeof info.cell.raw==='string' && info.cell.raw.includes('ALERTA')) { info.cell.styles.textColor=[200,40,40]; info.cell.styles.fontStyle='bold'; }}});
+    y=doc.lastAutoTable.finalY+10;
+    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(15,63,138); doc.text('III. SISTEMA ENTÉRICO (DIGESTIVO)',margin,y); y+=4; doc.line(margin,y,W-margin,y); y+=5;
+    doc.autoTable({startY:y,margin:{left:margin,right:margin},theme:'grid',headStyles:{fillColor:[15,63,138],textColor:[255,255,255],fontStyle:'bold',fontSize:9},bodyStyles:{fontSize:9,textColor:[40,40,40]},columnStyles:{0:{fontStyle:'bold',cellWidth:55}},head:[['Parâmetro','Animais Obs.','% do Lote','Limiar','Status']],body:[['Escore 1 — Normais',d.e1||0,d.e1p.toFixed(1)+'%','—','—'],['Escore 2 — Pastosas',d.e2||0,d.e2p.toFixed(1)+'%','—','—'],['Escore 3 — Líquidas',d.e3||0,d.e3p.toFixed(1)+'%','> 15%',d.liqFreq>15?'ALERTA':'Normal'],['Duração do quadro',d.duration,'—','—','—']],didParseCell(info){ if(typeof info.cell.raw==='string' && info.cell.raw.includes('ALERTA')) { info.cell.styles.textColor=[200,40,40]; info.cell.styles.fontStyle='bold'; }}});
+    y=doc.lastAutoTable.finalY+10;
+    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(15,63,138); doc.text('IV. ALERTAS SANITÁRIOS',margin,y); y+=4; doc.line(margin,y,W-margin,y); y+=6;
+    const alertsData=d.alerts.length===0?[['Normal','Nenhum alerta sanitário identificado. Todos os índices normais.']]:d.alerts.map(a=>['ALERTA',a]);
+    doc.autoTable({startY:y,margin:{left:margin,right:margin},theme:'grid',headStyles:{display:'none'},bodyStyles:{fontSize:9},columnStyles:{0:{fontStyle:'bold',cellWidth:20}},body:alertsData,didParseCell(info){ if(info.row.raw[0]==='ALERTA'){ info.cell.styles.textColor=[200,40,40]; if(info.column.index===0) info.cell.styles.fillColor=[255,235,235]; } else { info.cell.styles.textColor=[30,120,50]; if(info.column.index===0) info.cell.styles.fillColor=[220,245,225]; } }});
+  });
+  const pageCount=doc.getNumberOfPages();
+  for(let i=1;i<=pageCount;i++){ doc.setPage(i); doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(160,160,160); doc.text('SuinoSaúde — Gerado em '+new Date().toLocaleString('pt-BR'),margin,doc.internal.pageSize.getHeight()-8); doc.text('Pág. '+i+' / '+pageCount,W-margin,doc.internal.pageSize.getHeight()-8,{align:'right'}); }
+  const first=records[0], filename=records.length===1?`SuinoSaude_${first.producer.replace(/\s+/g,'_')}_${first.date.replace(/\//g,'-')}.pdf`:`SuinoSaude_Selecionados_${records.length}.pdf`;
+  doc.save(filename); showToast('📄 PDF gerado com sucesso!','#388bfd');
+}
+
+function generateExcel(recordsInput){
+  try{
+    const records=(Array.isArray(recordsInput)?recordsInput:[recordsInput]).map(normalizeRecord);
+    const wb=XLSX.utils.book_new();
+
+    const summary=[['Resumo Consolidado'],[''],['Produtor','Granja','Data','Score','Status','Tosses %','Espirros %','Diarreia %','CO2','Alertas']];
+    records.forEach(d=>summary.push([d.producer,d.farm,d.date,d.score,d.scoreStatus,+d.cFreq.toFixed(2),+d.sFreq.toFixed(2),+d.liqFreq.toFixed(2),d.co2,d.alerts.length?d.alerts.join(' | '):'Nenhum alerta']));
+    const wsSummary=XLSX.utils.aoa_to_sheet(summary);
+    wsSummary['!cols']=[{wch:20},{wch:24},{wch:12},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12},{wch:10},{wch:60}];
+    XLSX.utils.book_append_sheet(wb,wsSummary,'Resumo');
+
+    const usedNames = new Set(['Resumo']);
+    const makeUniqueName = (base, index) => {
+      let name = sanitizeSheetName(base);
+      if (!name) name = `Relatorio_${index+1}`;
+      if (name.length > 31) name = name.slice(0, 31);
+      let candidate = name;
+      let n = 2;
+      while (usedNames.has(candidate)) {
+        const suffix = `_${n}`;
+        candidate = name.slice(0, Math.max(1, 31 - suffix.length)) + suffix;
+        n++;
+      }
+      usedNames.add(candidate);
+      return candidate;
+    };
+
+    records.forEach((d, idx)=>{
+      const ws=XLSX.utils.aoa_to_sheet([
+        ['RELATÓRIO DE AVALIAÇÃO SANITÁRIA — SUÍNOS'],
+        [''],
+        ['Campo','Valor'],
+        ['Produtor',d.producer],
+        ['Granja / Local',d.farm],
+        ['Data da Visita',d.date],
+        ['Fase de Criação',d.phase],
+        ['Tipo de Ração',d.feed],
+        ['Protocolo Medicamentoso',d.meds],
+        ['Total de Animais no Lote',d.T],
+        ['Ambiência',`${d.temp}°C / ${d.umidade}% / ${d.co2} ppm`],
+        ['Score Geral',`${d.score}/100 (${d.scoreStatus})`],
+        [''],
+        ['RESPIRATÓRIO','Contagem 1','Contagem 2','Contagem 3','Média','Frequência (%)','Limiar','Status'],
+        ['Tosses',d.c1||0,d.c2||0,d.c3||0,+d.cAvg.toFixed(2),+d.cFreq.toFixed(2),10,d.cFreq>=10?'ALERTA':'Normal'],
+        ['Espirros',d.s1||0,d.s2||0,d.s3||0,+d.sAvg.toFixed(2),+d.sFreq.toFixed(2),15,d.sFreq>=15?'ALERTA':'Normal'],
+        [''],
+        ['ENTÉRICO','Qtd.','% do Observado','% do Lote','Limiar','Status'],
+        ['Escore 1 — Normais',d.e1||0,+d.e1p.toFixed(2),'—','—','—'],
+        ['Escore 2 — Pastosas',d.e2||0,+d.e2p.toFixed(2),'—','—','—'],
+        ['Escore 3 — Líquidas',d.e3||0,+d.e3p.toFixed(2),+d.liqFreq.toFixed(2),15,d.liqFreq>15?'ALERTA':'Normal'],
+        ['Duração do quadro',d.duration],
+        [''],
+        ['ALERTAS'],
+        ...(d.alerts.length?d.alerts.map(a=>['ALERTA',a]):[['Normal','Nenhum alerta sanitário identificado.']])
+      ]);
+      ws['!cols']=[{wch:28},{wch:18},{wch:18},{wch:18},{wch:16},{wch:14},{wch:14},{wch:14}];
+      const sheetName = makeUniqueName(`${idx+1}_${d.producer}_${d.date}`, idx);
+      XLSX.utils.book_append_sheet(wb,ws,sheetName);
+    });
+
+    const first=records[0];
+    const filename=records.length===1?`SuinoSaude_${first.producer.replace(/\s+/g,'_')}_${first.date.replace(/\//g,'-')}.xlsx`:`SuinoSaude_Selecionados_${records.length}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    showToast('📊 Excel gerado com sucesso!','#2ea043');
+  } catch (err) {
+    console.error('Erro ao exportar Excel:', err);
+    showToast('⚠️ Falha ao gerar Excel. Verifique os dados selecionados.', '#da3633');
+  }
+}
+
+function buildWhatsAppMessage(records){
+  const items = (records || []).map(normalizeRecord).filter(Boolean);
+  if (items.length === 0) {
+    return `🐷 *AVALIAÇÃO SANITÁRIA*\n━━━━━━━━━━━━━━━━━━━\nNenhum relatório disponível.\n━━━━━━━━━━━━━━━━━━━\n_Gerado pelo SuinoSaúde App_`;
+  }
+
+  const weightedAvg = (arr, key) => {
+    const totalAnimals = arr.reduce((sum, r) => sum + Number(r.T || 0), 0);
+    if (totalAnimals > 0) {
+      return arr.reduce((sum, r) => sum + Number(r[key] || 0) * Number(r.T || 0), 0) / totalAnimals;
+    }
+    return arr.length ? arr.reduce((sum, r) => sum + Number(r[key] || 0), 0) / arr.length : 0;
+  };
+
+  const alertLabel = (text) => {
+    const t = String(text || '').toLowerCase();
+    if (t.includes('pneumonia') || t.includes('tosse')) return 'Tosse';
+    if (t.includes('rinite') || t.includes('espirro')) return 'Espirro';
+    if (t.includes('diarreia') || t.includes('lote afetado')) return 'Diarreia';
+    if (t.includes('co2')) return 'CO2';
+    return '';
+  };
+
+  if (items.length === 1) {
+    const d = items[0];
+    const lines = [
+      `🐷 *${d.farm}* | ${d.date}`,
+      `👨‍🌾 ${d.producer}`,
+      `🐖 ${d.phase} | ${d.T} animais`,
+      `🏅 Score: ${d.score}/100 (${d.scoreStatus})`,
+      `🫁 Tosse: ${d.cFreq.toFixed(1)}% | 🤧 Espirro: ${d.sFreq.toFixed(1)}% | 💧 Diarreia: ${d.liqFreq.toFixed(1)}%`
+    ];
+    const singleAlerts = [...new Set((d.alerts || []).map(alertLabel).filter(Boolean))];
+    lines.push(singleAlerts.length ? `⚠️ *Alertas:* ${singleAlerts.join(' | ')}` : '✅ Sem alertas sanitários');
+    lines.push('━━━━━━━━━━━━━━━━━━━');
+    lines.push('_Gerado pelo SuinoSaúde App_');
+    return lines.join('\n');
+  }
+
+  const produtores = [...new Set(items.map(r => r.producer).filter(Boolean))];
+  const produtoresTexto = produtores.length <= 3
+    ? produtores.join(', ')
+    : `${produtores.slice(0, 2).join(', ')} +${produtores.length - 2}`;
+
+  const totalAnimais = items.reduce((acc, r) => acc + Number(r.T || 0), 0);
+  const scoreMedio = Math.round(weightedAvg(items, 'score'));
+  const scoreStatus = scoreMedio >= 85 ? 'Excelente' : (scoreMedio >= 70 ? 'Atenção' : 'Crítico');
+
+  const cFreq = weightedAvg(items, 'cFreq');
+  const sFreq = weightedAvg(items, 'sFreq');
+  const liqFreq = weightedAvg(items, 'liqFreq');
+
+  const alertas = [];
+  if (cFreq >= 10) alertas.push('Tosse');
+  if (sFreq >= 15) alertas.push('Espirro');
+  if (liqFreq > 15) alertas.push('Diarreia');
+
+  const lines = [
+    `🐷 *AVALIAÇÃO SANITÁRIA CONSOLIDADA*`,
+    `━━━━━━━━━━━━━━━━━━━`,
+    `👨‍🌾 *Produtores:* ${produtoresTexto}`,
+    `📊 *Relatórios:* ${items.length}`,
+    `🐖 *Animais avaliados:* ${totalAnimais}`,
+    `🏅 *Score médio:* ${scoreMedio}/100 (${scoreStatus})`,
+    `🫁 *Tosse média:* ${cFreq.toFixed(1)}%`,
+    `🤧 *Espirro médio:* ${sFreq.toFixed(1)}%`,
+    `💧 *Diarreia média:* ${liqFreq.toFixed(1)}%`
+  ];
+
+  if (alertas.length > 0) {
+    lines.push(`⚠️ *Alertas:* ${alertas.join(' | ')}`);
+  } else {
+    lines.push(`✅ *Sem alertas sanitários*`);
+  }
+
+  lines.push('━━━━━━━━━━━━━━━━━━━');
+  lines.push('_Gerado pelo SuinoSaúde App_');
+  return lines.join('\n');
+}
+
+function openWhatsApp(){ const d=getExportData(); window.location.href=`https://wa.me/?text=${encodeURIComponent(buildWhatsAppMessage([d]))}`; }
+function exportSelectedPDF(){ const records=getExportTargets(true); if(!records) return; generatePDF(records); }
+function exportSelectedExcel(){ const records=getExportTargets(true); if(!records) return; generateExcel(records); }
+function exportSelectedWhatsApp(){ const records=getExportTargets(true); if(!records) return; window.location.href=`https://wa.me/?text=${encodeURIComponent(buildWhatsAppMessage(records))}`; }
+
+function saveToLocalDB(){
+  if(state.totalAnimals===0) return showToast('⚠️ Preencha os dados no Cadastro antes de salvar!','#da3633');
+  try{
+    const data=getExportData(); saveCustomVocabulary(data.feed, data.meds);
+    const history=getHistory(); history.push({id:Date.now(), synced:false, ...data});
+    if(!safeSet('suino_history', JSON.stringify(history))) throw new Error('localStorage indisponível');
+    showToast('💾 Salvo no celular!','#2ea043');
+    safeSet('suino_draft','');
+    ['f_producer','f_farm','f_feed','f_meds','f_total','f_temp','f_umidade','f_co2'].forEach(id=>document.getElementById(id).value='');
+    ['c1','c2','c3','s1','s2','s3','e1','e2','e3'].forEach(k=>{state[k]=0; document.getElementById(k).textContent='0'});
+    state.totalAnimals=0; f_phase.value=''; f_duration.value='Insignificante (< 24h)';
+    const t=new Date(); f_date.value=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    selectedReports=[]; updateSelectionInfo(); setTimeout(()=>goTo(6),800);
+  }catch(e){ console.error(e); alert('Não foi possível salvar localmente neste navegador. Tente abrir em outro navegador ou instalar como app.'); }
+}
+
+function toggleSelection(id, checked){ id=Number(id); if(checked){ if(!selectedReports.includes(id)) selectedReports.push(id); } else selectedReports=selectedReports.filter(x=>x!==id); updateSelectionInfo(); }
+function selectAllHistory(){ selectedReports=getHistory().map(v=>Number(v.id)); renderHistory(); updateSelectionInfo(); }
+function clearSelection(){ selectedReports=[]; renderHistory(); updateSelectionInfo(); }
+function updateSelectionInfo(){ selection_info.textContent=`${selectedReports.length} selecionado${selectedReports.length===1?'':'s'}`; }
+
+function exportHistPDF(id){ const item=getHistoryById(id); if(item) generatePDF([item]); }
+function exportHistExcel(id){ const item=getHistoryById(id); if(item) generateExcel([item]); }
+function exportHistWhatsApp(id){ const item=getHistoryById(id); if(item) window.location.href=`https://wa.me/?text=${encodeURIComponent(buildWhatsAppMessage([item]))}`; }
+
+function deleteSelectedHistory(){
+  if(selectedReports.length === 0){
+    showToast('⚠️ Nenhum relatório selecionado para apagar.','#da3633');
+    return;
+  }
+  if(confirm(`Tem certeza que deseja apagar ${selectedReports.length} relatório(s) selecionado(s)?`)){
+    let history = getHistory().filter(v => !selectedReports.includes(Number(v.id)));
+    safeSet('suino_history', JSON.stringify(history));
+    selectedReports = [];
+    renderHistory();
+    updateSelectionInfo();
+    showToast('🗑️ Selecionados apagados!','#da3633');
+  }
+}
+
+function renderHistory(){
+  const list=history_list, history=getHistory();
+  selectedReports=selectedReports.filter(id=>history.some(v=>Number(v.id)===Number(id))); updateSelectionInfo();
+  if(!history.length){ list.innerHTML='<div class="card"><p style="color:var(--text2);text-align:center;">Nenhuma visita salva localmente ainda.</p></div>'; return; }
+  const reversed=[...history].sort((a,b)=>parseDateFlexible(b)-parseDateFlexible(a));
+  list.innerHTML=reversed.map(v=>{
+    const scoreClass=v.score>=85?'good':(v.score>=70?'mid':'bad');
+    return `<div class="history-item">
+      <div class="history-top">
+        <div class="history-left">
+          <input class="history-check" type="checkbox" onchange="toggleSelection(${v.id}, this.checked)" ${selectedReports.includes(Number(v.id))?'checked':''}>
+          <div style="min-width:0">
+            <h4>${v.producer} — ${v.farm}<span class="score-chip ${scoreClass}">Score ${v.score}/100</span></h4>
+            <p>Data: ${v.date} | Total de Animais: <strong>${v.T}</strong></p>
+            <p>Fase: ${v.phase} | ${v.temp}°C / ${v.umidade}% / ${v.co2} ppm</p>
+            <p style="margin-top:8px;"><span style="margin-right:12px;">🫁 Tosses: ${parseFloat(v.cFreq).toFixed(1)}%</span><span style="margin-right:12px;">🤧 Espirros: ${parseFloat(v.sFreq).toFixed(1)}%</span><span>💧 Diarreia: ${parseFloat(v.liqFreq).toFixed(1)}%</span></p>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let toastTimer;
+function showToast(msg,color){ toast_msg.textContent=msg; toast.style.borderColor=color; toast.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.remove('show'),3000); }
+
+loadDatalists();
+loadDraft();
+updateSelectionInfo();
+</script>
+</body>
+</html>
